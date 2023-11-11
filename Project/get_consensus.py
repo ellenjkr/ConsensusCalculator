@@ -12,167 +12,138 @@ all_sequences = []
 alignment_info = {'Amostra': [], 'Consenso': [], 'Comprimento': [], 'Clusters': [], 'Total de Sequências': [], 'Sequências Cluster 1': [], '% Cluster 1': [], 'Sequências Cluster 2': [], '% Cluster 2': [], 'Sequências Cluster 3': [], '% Cluster 3': []}
 
 with open('output/log.txt', 'w') as log:
-	for file in os.listdir('input_lib2'):
-		file_path = f'./input_lib2/{file}'
-		# original_file_path = f'./fasta_files/{file}'
-		file_name = file.replace('.fa', '')
-		file_name = file_name.replace('.fasta', '')
-		file_name = file_name.replace('.fas', '')
+	for file in os.listdir('input/input_ani3/'):
+		if '3.5' not in file:
+			file_path = f'./input/input_ani3/{file}'
+			# original_file_path = f'./fasta_files/{file}'
+			file_name = file.replace('.fa', '')
+			file_name = file_name.replace('.fasta', '')
+			file_name = file_name.replace('.fas', '')
 
-		if not os.path.exists(f"output/{file_name}"):
-			os.makedirs(f"output/{file_name}")
-		
-		
-		with open(file_path, 'r') as file:
-			lines = file.readlines()
-
-		sequences = []
-		seq = ''
-		count = 1
-
-		for line in lines:
-			if line.startswith('>'):
-				sequences.append(f'>{count}\n')
-				count += 1
-			else:
-				sequences.append(line)
-
-		with open(file_path, 'w') as file:
-			file.write(''.join(sequences))
-
-		subprocess.run(
-			f'source /home/bioinfo/miniconda3/etc/profile.d/conda.sh && \
-			conda activate cdhit-env && \
-			cd-hit -T 10 -i {file_path} -o ./output/{file_name}/clustering.fasta -n 3 -aL 0.8 -aS 0.8 -c 0.7 && \
-			conda deactivate',
-			shell=True,
-			executable='/bin/bash'
-		)
-
-
-		with open(f'output/{file_name}/clustering.fasta.clstr', 'r') as f:
-			clustering = f.read()
-
-			clusters = re.findall(r'>Cluster \d*', clustering)
-			clusters_content = re.split(r'>Cluster \d*\n', clustering)
-			clusters_content.remove('')
-			n_seq = 0
-			clusters_sizes = {}
-			for pos, cluster in enumerate(clusters):
-				# cluster_content = re.search(rf'({cluster}[\s\S]*)(?=>Cluster)', clustering)
-				# if len(cluster_content) == 0:
-				# 	cluster_content = re.findall(rf'({cluster}[\s\S]*)', clustering)
-				cluster_number = int(cluster[-1])
-				cluster_content = clusters_content[cluster_number]
-				cluster_seq_count = len(cluster_content.split('\n')) - 1
-				if cluster_seq_count >= 5:
-					clusters_sizes[cluster_number] = cluster_seq_count
-				# if cluster_seq_count > n_seq:
-				# 	n_seq = cluster_seq_count
-				# 	main_cluster = cluster_content
-
-			clusters_sizes = {k: v for k, v in sorted(clusters_sizes.items(), reverse=True, key=lambda item: item[1])}
-			n_seq = clusters_sizes[list(clusters_sizes.keys())[0]]
-			main_cluster = clusters_content[list(clusters_sizes.keys())[0]]
-			scores = re.findall(r'>(.*)\.\.\. (.*)', main_cluster)
-			sequences2align = []
-			for score in scores:
-				sequences2align.append(score[0])
-			# clusters = re.findall(r'(>Cluster .*[\s\S]*)(?=>Cluster)', clustering)
-			# if len(main_cluster) == 0:
-			# 	main_cluster = re.findall(r'>Cluster 0[\s\S]*', clustering)[0]
-			# else:
-			# 	main_cluster = main_cluster[0]
+			if not os.path.exists(f"output/{file_name}"):
+				os.makedirs(f"output/{file_name}")
 			
-			# scores = re.findall(r'>(.*)\.\.\. (.*)', main_cluster)
+			
+			with open(file_path, 'r') as file:
+				lines = file.readlines()
 
-			# reference = None
-			# sequences2align = []
-			# for score in scores:
-			# 	if score[1] == '*':
-			# 		reference = score[0]
-			# 	else:
-			# 		sequences2align.append(score[0])
+			sequences = []
+			seq = ''
+			count = 1
 
+			for line in lines:
+				if line.startswith('>'):
+					sequences.append(f'>{count}\n')
+					count += 1
+				else:
+					sequences.append(line)
 
-		sequences = SeqIO.to_dict(SeqIO.parse(file_path, "fasta"))
-		total_sequences = len(sequences.keys())
-
-		reference_seq = sequences[reference]
-		SeqIO.write([reference_seq], f'./output/{file_name}/reference.fasta', "fasta")
-
-		sequences = {item[0]: item[1] for item in sequences.items() if item[0] in sequences2align}
-		with open(f'./output/{file_name}/sequences2align.fasta', 'w') as handle:
-			SeqIO.write(sequences.values(), handle, 'fasta')
-
-		aligned_sequences = len(sequences) + 1
-		# total_sequences = len(SeqIO.to_dict(SeqIO.parse(original_file_path, "fasta")).keys())
-
-		if aligned_sequences > 1:
-			# subprocess.run(
-			# 	f'mafft --6merpair --quiet --addfragments ./output/{file_name}/sequences2align.fasta ./output/{file_name}/reference.fasta > ./output/{file_name}/alignment.fasta',
-			# 	shell=True,
-			# 	executable='/bin/bash'
-			# )
-
-			subprocess.run(
-				f'mafft --quiet --thread 10 ./output/{file_name}/sequences2align.fasta > ./output/{file_name}/alignment.fasta',
-				shell=True,
-				executable='/bin/bash'
-			)
-
+			with open(file_path, 'w') as file:
+				file.write(''.join(sequences))
 
 			subprocess.run(
 				f'source /home/bioinfo/miniconda3/etc/profile.d/conda.sh && \
-				conda activate emboss-env && \
-				cons ./output/{file_name}/alignment.fasta ./output/{file_name}/consensus.fasta && \
+				conda activate cdhit-env && \
+				cd-hit -T 10 -i {file_path} -o ./output/{file_name}/clustering.fasta -n 3 -aL 0.8 -aS 0.8 -c 0.7 && \
 				conda deactivate',
 				shell=True,
 				executable='/bin/bash'
 			)
 
-			sequences = []
-			with open(f'output/{file_name}/consensus.fasta', 'r') as file:
-				for record in SeqIO.parse(file, "fasta"):
-					record.seq = Seq(str(record.seq).replace('\n', ''))
-					record.seq = Seq(str(record.seq).replace('n', ''))
-					record.seq = Seq(str(record.seq).replace('N', ''))
-					record.id = file_name
-					sequences.append(record)
-					all_sequences.append(record)
 
-					nseqs_cluster1 = clusters_sizes[list(clusters_sizes.keys())[0]]
-					if len(list(clusters_sizes.keys())) > 1:
-						nseqs_cluster2 = clusters_sizes[list(clusters_sizes.keys())[1]]
-						alignment_info['Sequências Cluster 2'].append(nseqs_cluster2)
-						alignment_info['% Cluster 2'].append(nseqs_cluster2 / total_sequences * 100)
-					else:
-						alignment_info['Sequências Cluster 2'].append(0)
-						alignment_info['% Cluster 2'].append(0)
+			with open(f'output/{file_name}/clustering.fasta.clstr', 'r') as f:
+				clustering = f.read()
 
-					if len(list(clusters_sizes.keys())) > 2:
-						nseqs_cluster3 = clusters_sizes[list(clusters_sizes.keys())[2]]
-						alignment_info['Sequências Cluster 3'].append(nseqs_cluster3)
-						alignment_info['% Cluster 3'].append(nseqs_cluster3 / total_sequences * 100)
-					else:
-						alignment_info['Sequências Cluster 3'].append(0)
-						alignment_info['% Cluster 3'].append(0)
-
-					alignment_info['Amostra'].append(file_name)
-					alignment_info['Consenso'].append(record.seq)
-					alignment_info['Comprimento'].append(len(record.seq))
-					alignment_info['Clusters'].append(len(clusters_sizes.keys()))
-					alignment_info['Total de Sequências'].append(total_sequences)
-					alignment_info['Sequências Cluster 1'].append(nseqs_cluster1)
-					alignment_info['% Cluster 1'].append(nseqs_cluster1 / total_sequences * 100)
-					
-
-			with open(f'output/{file_name}/consensus.fasta', 'w') as file:
-				SeqIO.write(sequences, file, "fasta")
+				clusters = re.findall(r'>Cluster \d*', clustering)
+				clusters_content = re.split(r'>Cluster \d*\n', clustering)
+				clusters_content.remove('')
+				n_seq = 0
+				clusters_sizes = {}
+				for pos, cluster in enumerate(clusters):
+					cluster_number = int(cluster[-1])
+					cluster_content = clusters_content[cluster_number]
+					cluster_seq_count = len(cluster_content.split('\n')) - 1
+					if cluster_seq_count >= 5:
+						clusters_sizes[cluster_number] = cluster_seq_count
 
 
-		else:
-			log.write(f'Error in file {file}\tNo sequences to align\n')
+				clusters_sizes = {k: v for k, v in sorted(clusters_sizes.items(), reverse=True, key=lambda item: item[1])}
+				n_seq = clusters_sizes[list(clusters_sizes.keys())[0]]
+				main_cluster = clusters_content[list(clusters_sizes.keys())[0]]
+
+				scores = re.findall(r'>(.*)\.\.\. (.*)', main_cluster)
+				sequences2align = []
+				for score in scores:
+					sequences2align.append(score[0])
+
+			sequences = SeqIO.to_dict(SeqIO.parse(file_path, "fasta"))
+			total_sequences = len(sequences.keys())
+
+			sequences = {item[0]: item[1] for item in sequences.items() if item[0] in sequences2align}
+			with open(f'./output/{file_name}/sequences2align.fasta', 'w') as handle:
+				SeqIO.write(sequences.values(), handle, 'fasta')
+
+			aligned_sequences = len(sequences) + 1
+
+			if aligned_sequences > 1:
+				subprocess.run(
+					f'mafft --quiet --thread 10 ./output/{file_name}/sequences2align.fasta > ./output/{file_name}/alignment.fasta',
+					shell=True,
+					executable='/bin/bash'
+				)
+
+
+				subprocess.run(
+					f'source /home/bioinfo/miniconda3/etc/profile.d/conda.sh && \
+					conda activate emboss-env && \
+					cons ./output/{file_name}/alignment.fasta ./output/{file_name}/consensus.fasta && \
+					conda deactivate',
+					shell=True,
+					executable='/bin/bash'
+				)
+
+				sequences = []
+				with open(f'output/{file_name}/consensus.fasta', 'r') as file:
+					for record in SeqIO.parse(file, "fasta"):
+						record.seq = Seq(str(record.seq).replace('\n', ''))
+						record.seq = Seq(str(record.seq).replace('n', ''))
+						record.seq = Seq(str(record.seq).replace('N', ''))
+						record.id = file_name
+						sequences.append(record)
+						all_sequences.append(record)
+
+						nseqs_cluster1 = clusters_sizes[list(clusters_sizes.keys())[0]]
+						if len(list(clusters_sizes.keys())) > 1:
+							nseqs_cluster2 = clusters_sizes[list(clusters_sizes.keys())[1]]
+							alignment_info['Sequências Cluster 2'].append(nseqs_cluster2)
+							alignment_info['% Cluster 2'].append(nseqs_cluster2 / total_sequences * 100)
+						else:
+							alignment_info['Sequências Cluster 2'].append(0)
+							alignment_info['% Cluster 2'].append(0)
+
+						if len(list(clusters_sizes.keys())) > 2:
+							nseqs_cluster3 = clusters_sizes[list(clusters_sizes.keys())[2]]
+							alignment_info['Sequências Cluster 3'].append(nseqs_cluster3)
+							alignment_info['% Cluster 3'].append(nseqs_cluster3 / total_sequences * 100)
+						else:
+							alignment_info['Sequências Cluster 3'].append(0)
+							alignment_info['% Cluster 3'].append(0)
+
+						alignment_info['Amostra'].append(file_name)
+						alignment_info['Consenso'].append(record.seq)
+						alignment_info['Comprimento'].append(len(record.seq))
+						alignment_info['Clusters'].append(len(clusters_sizes.keys()))
+						alignment_info['Total de Sequências'].append(total_sequences)
+						alignment_info['Sequências Cluster 1'].append(nseqs_cluster1)
+						alignment_info['% Cluster 1'].append(nseqs_cluster1 / total_sequences * 100)
+						
+
+				with open(f'output/{file_name}/consensus.fasta', 'w') as file:
+					SeqIO.write(sequences, file, "fasta")
+
+
+			else:
+				log.write(f'Error in file {file}\tNo sequences to align\n')
 
 
 
@@ -191,8 +162,6 @@ subprocess.run(
 	shell=True,
 	executable='/bin/bash'
 )
-
-
 
 
 alignment_info_df = pd.DataFrame(alignment_info)
@@ -296,7 +265,7 @@ def build_excel_sheet(writer, sheet_name, df):
 	return (writer, worksheet)
 
 
-writer = pd.ExcelWriter(f'output/lib2_with_tolerance.xlsx', engine='xlsxwriter')
+writer = pd.ExcelWriter(f'output/lib4_ani3.xlsx', engine='xlsxwriter')
 writer, worksheet = build_excel_sheet(writer, 'BLAST', blast_df)
 writer, worksheet = build_excel_sheet(writer, 'Consenso', alignment_info_df)
 
