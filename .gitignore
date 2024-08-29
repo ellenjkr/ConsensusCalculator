@@ -6,3 +6,5 @@ Project/input/
 Project/input_lib2/
 *.ipynb
 *.jupyterlab-workspace
+Project/output_backup/*
+*.pyc

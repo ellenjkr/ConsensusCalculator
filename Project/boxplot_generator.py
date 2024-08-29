@@ -24,14 +24,10 @@ import matplotlib.pyplot as plt
 
 # Lista de nomes dos arquivos Excel
 file_paths = [
-    'output/lib4/lib4_ani1.xlsx',
-    'output/lib4/lib4_ani2.xlsx',
-    'output/lib4/lib4_ani3.xlsx',
-    'output/lib4/lib4_bac.xlsx',
-    'output/lib4/lib4_veg1.xlsx'
+    'output/LIB6/lib6_ani_consensus.xlsx'
 ]
 
-xticks = ['ANI1', 'ANI2', 'ANI3', 'BAC', 'VEG1']
+xticks = ['ANI']
 
 # Lista para armazenar os DataFrames de cada arquivo Excel
 dfs = []
@@ -43,12 +39,12 @@ for file_path in file_paths:
 
 # Criando boxplots
 columns_to_plot = ['Clusters', '% Cluster 1', 'Comprimento', 'Primeiro Resultado pident', 'Primeiro Resultado qcovs', 'Primeiro Resultado gaps']
-columns_to_plot = ['Primeiro Resultado pident', 'Primeiro Resultado qcovs', 'Primeiro Resultado gaps']
+# columns_to_plot = ['Primeiro Resultado pident', 'Primeiro Resultado qcovs', 'Primeiro Resultado gaps']
 
 plt.figure(figsize=(18, 12))
 
 for i, column in enumerate(columns_to_plot, 1):
-    plt.subplot(2, 2, i)
+    plt.subplot(2, 3, i)
     data_to_plot = [df[column] for df in dfs]
     plt.boxplot(data_to_plot)
     column = column.replace('pident', 'Identidade')
