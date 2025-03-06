@@ -11,15 +11,17 @@ from copy import deepcopy
 
 from remove_primers import remove_primers
 
-
 def read_yaml(file_path):
 	with open(file_path, "r") as f:
 		return yaml.safe_load(f)
 
-def add_clusters_keys(alignment_info, clusters2process):
-	for i in range(clusters2process):
+def add_clusters_keys(alignment_info, old_clusters_count, new_clusters):
+	for i in range(old_clusters_count, new_clusters):
 		alignment_info[f'Sequências Cluster {i+1}'] = []
-		alignment_info[f'% Cluster {i+1}'] = []	
+		alignment_info[f'% Cluster {i+1}'] = []
+		for sample in alignment_info['Amostra']:
+			alignment_info[f'Sequências Cluster {i+1}'].append(0)
+			alignment_info[f'% Cluster {i+1}'].append(0)
 
 	return alignment_info
 
@@ -41,6 +43,7 @@ def processs_files(config, files_report, alignment_info):
 
 
 def process_file(file, file_path, alignment_info, config):
+	global max_clusters_count
 	file_name = file.replace('.fa', '')
 	file_name = file_name.replace('.fasta', '')
 	file_name = file_name.replace('.fas', '')
@@ -56,11 +59,11 @@ def process_file(file, file_path, alignment_info, config):
 	count = 1
 
 	for line in lines:
-		if line.startswith('>'):
-			sequences.append(f'>{count}\n')
-			count += 1
-		else:
-			sequences.append(line)
+	# 	if line.startswith('>'):
+	# 		sequences.append(f'>{count}\n')
+	# 		count += 1
+	# 	else:
+		sequences.append(line)
 
 	with open(file_path, 'w') as file:
 		file.write(''.join(sequences))
@@ -71,7 +74,7 @@ def process_file(file, file_path, alignment_info, config):
 	subprocess.run(
 		f"source {config['CONDA_SOURCE']} && \
 		conda activate cdhit-env && \
-		cd-hit -T 10 -i {file_path} -o {config['OUTPUT_PATH']}{file_name}/clustering.fasta -n 3 -aL {config['CLUSTERING_PARAMS']['aL']} -aS {config['CLUSTERING_PARAMS']['aS']} -c {config['CLUSTERING_PARAMS']['c']} && \
+		cd-hit -d 100 -T 10 -i {file_path} -o {config['OUTPUT_PATH']}{file_name}/clustering.fasta -n 3 -aL {config['CLUSTERING_PARAMS']['aL']} -aS {config['CLUSTERING_PARAMS']['aS']} -c {config['CLUSTERING_PARAMS']['c']} && \
 		conda deactivate",
 		shell=True,
 		executable='/bin/bash'
@@ -83,10 +86,15 @@ def process_file(file, file_path, alignment_info, config):
 
 		clusters = re.findall(r'>Cluster \d*', clustering)
 		clusters_content = re.split(r'>Cluster \d*\n', clustering)
+
 		clusters_content.remove('')
 		clusters_sizes = {}
+
+		if len(clusters) > max_clusters_count:
+			alignment_info = add_clusters_keys(alignment_info, max_clusters_count, len(clusters))
+			max_clusters_count = len(clusters) 
 		for pos, cluster in enumerate(clusters):
-			cluster_number = int(cluster[-1])
+			cluster_number = int(cluster.replace(">Cluster ", ""))
 			cluster_content = clusters_content[cluster_number]
 			cluster_seq_count = len(cluster_content.split('\n')) - 1
 			if cluster_seq_count >= int(config['MIN_SEQS_FOR_CONSENSUS']):
@@ -97,12 +105,11 @@ def process_file(file, file_path, alignment_info, config):
 
 	files_report[file_name] = {'clusters_content': clusters_content, 'clusters_sizes': clusters_sizes, 'sequences': sequences}
 
-	
 	alignment_info['Amostra'].append(file_name)
 	alignment_info['Total de Sequências'].append(total_sequences)
 	alignment_info['Clusters'].append(len(clusters_sizes.keys()))
 
-	for i in range(config['CLUSTERS2PROCESS']):
+	for i in range(max_clusters_count):
 		if len(list(clusters_sizes.keys())) > i:
 			nseqs_cluster = clusters_sizes[list(clusters_sizes.keys())[i]]
 			alignment_info[f'% Cluster {i + 1}'].append(nseqs_cluster / total_sequences * 100)
@@ -110,13 +117,13 @@ def process_file(file, file_path, alignment_info, config):
 		else:
 			alignment_info[f'% Cluster {i + 1}'].append(0)
 			alignment_info[f'Sequências Cluster {i + 1}'].append(0)
-
 	return files_report, alignment_info
 
 
 def get_consensus(config, files_report, primers_df):
+	global max_clusters_count
 	all_sequences = []
-	clusters_reports = [{'Amostra': [], 'Consenso': [], 'Comprimento': []} for i in range(config['CLUSTERS2PROCESS'])]
+	clusters_reports = [{'Amostra': [], 'Consenso': [], 'Comprimento': []} for i in range(max_clusters_count)]
 	for cluster_report_pos in range(len(clusters_reports)):
 		for file, report in files_report.items():
 			clusters_content = report['clusters_content']
@@ -126,6 +133,7 @@ def get_consensus(config, files_report, primers_df):
 				cluster = list(clusters_sizes.keys())[cluster_report_pos]
 				
 				cluster_content = clusters_content[cluster]
+
 				scores = re.findall(r'>(.*)\.\.\. (.*)', cluster_content)
 				sequences2align = []
 				for score in scores:
@@ -135,46 +143,50 @@ def get_consensus(config, files_report, primers_df):
 				with open(f"{config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_sequences2align.fasta", 'w') as handle:
 					SeqIO.write(cluster_sequences.values(), handle, 'fasta')
 
-				if len(cluster_sequences) > 2:
-					subprocess.run(
-						f"mafft --quiet --thread 10 {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_sequences2align.fasta > {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_alignment.fasta",
-						shell=True,
-						executable='/bin/bash'
-					)
+				subprocess.run(
+					f"mafft --quiet --thread 10 {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_sequences2align.fasta > {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_alignment.fasta",
+					shell=True,
+					executable='/bin/bash'
+				)
 
+				if len(cluster_sequences) >= 2:
 					subprocess.run(
 						f"source {config['CONDA_SOURCE']} && \
 						conda activate emboss-env && \
-						cons {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_alignment.fasta {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_consensus.fasta && \
+						cons {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_alignment.fasta {config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta && \
 						conda deactivate",
 						shell=True,
 						executable='/bin/bash'
 					)
+					print("created")
 
+				else:
+					os.system(f"cp {config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_sequences2align.fasta {config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta")  
 
-					consensus_sequences = []
-					with open(f"{config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_consensus.fasta", 'r') as consensus_file:
-						for record in SeqIO.parse(consensus_file, "fasta"):
-							record.seq = Seq(str(record.seq).replace('\n', ''))
-							record.seq = Seq(str(record.seq).replace('n', ''))
-							record.seq = Seq(str(record.seq).replace('N', ''))
-							record.id = f"cluster{cluster_report_pos + 1}@{file}"
-							consensus_sequences.append(record)
+				consensus_sequences = []
+				with open(f"{config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta", 'r') as consensus_file:
+					for record in SeqIO.parse(consensus_file, "fasta"):
+						record.seq = Seq(str(record.seq).replace('\n', ''))
+						record.seq = Seq(str(record.seq).replace('n', ''))
+						record.seq = Seq(str(record.seq).replace('N', ''))
+						record.id = f"cluster{cluster_report_pos + 1}@{file}"
+						consensus_sequences.append(record)
 
-					with open(f"{config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_consensus.fasta", 'w') as consensus_file:
-						SeqIO.write(consensus_sequences, consensus_file, "fasta")
+				with open(f"{config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta", 'w') as consensus_file:
+					SeqIO.write(consensus_sequences, consensus_file, "fasta")
 
-					if config['REMOVE_PRIMERS']:
-						remove_primers(file, primers_df, f"{config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_consensus.fasta", config)
-					
-					with open(f"{config['OUTPUT_PATH']}{file}/cluster{cluster_report_pos + 1}_consensus.fasta", 'r') as consensus_file:
-						for record in SeqIO.parse(consensus_file, "fasta"):
-							all_sequences.append(record)
+				if config['REMOVE_PRIMERS']:
+					remove_primers(file, primers_df, f"{config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta", config)
+				
+				with open(f"{config['OUTPUT_PATH']}{file}/{file}_consensus_{cluster_report_pos + 1}.fasta", 'r') as consensus_file:
+					for record in SeqIO.parse(consensus_file, "fasta"):
+						all_sequences.append(record)
 
-							clusters_reports[cluster_report_pos]['Amostra'].append(file)
-							clusters_reports[cluster_report_pos]['Consenso'].append(record.seq)
-							clusters_reports[cluster_report_pos]['Comprimento'].append(len(record.seq))
-							
+						clusters_reports[cluster_report_pos]['Amostra'].append(file)
+						clusters_reports[cluster_report_pos]['Consenso'].append(record.seq)
+						clusters_reports[cluster_report_pos]['Comprimento'].append(len(record.seq))
+
+						
 
 
 	return clusters_reports, all_sequences
@@ -332,6 +344,8 @@ def build_reports_sheets(config, clusters_reports, blast_df, alignment_info_df):
 
 
 if __name__ == "__main__":
+	global max_clusters_count
+	max_clusters_count = 0
 	config = read_yaml("config.yaml")
 	all_sequences = []
 	alignment_info = {'Amostra': [], 'Total de Sequências': [], 'Clusters': []}
@@ -341,7 +355,6 @@ if __name__ == "__main__":
 	if config['REMOVE_PRIMERS']:
 		primers_df = read_primers_file(config)
 
-	alignment_info = add_clusters_keys(alignment_info, config['CLUSTERS2PROCESS'])
 	files_report, alignment_info = processs_files(config, files_report, alignment_info)
 	clusters_reports, all_sequences = get_consensus(config, files_report, primers_df)
 	blast_df, alignment_info_df = run_blast(config, all_sequences, clusters_reports)

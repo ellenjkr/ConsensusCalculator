@@ -1,6 +1,6 @@
-INPUT_PATH: input/LIB15/RESISTOMA/
-OUTPUT_PATH: output/LIB15/RESISTOMA/
-OUTPUT_FILENAME: LIB15_RESISTOMA
+INPUT_PATH: input/LIB15/ANI_MTDNA_VEG/
+OUTPUT_PATH: output/LIB15/
+OUTPUT_FILENAME: LIB15_INDIV
 REMOVE_PRIMERS: FALSE
 THREADS: 10
 CONDA_SOURCE: /home/bioinfo/miniconda3/etc/profile.d/conda.sh
@@ -9,8 +9,8 @@ BLAST_DATABASE_PATH:  /media/bioinfo/6tb_hdd/04_Blast_Databases/new_nt/nt # nt o
 CLUSTERING_PARAMS:
   aL: 0.8 # 0.8
   aS: 0.8 # 0.8
-  c: 0.95 # 0.95
-MIN_SEQS_FOR_CONSENSUS: 1 # 1
+  c: 0.7 # 0.7
+MIN_SEQS_FOR_CONSENSUS: 5 # 5
 HIERARCHY_DATABASE:
   HOST: localhost
   USER: root
